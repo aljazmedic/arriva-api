@@ -6,7 +6,6 @@ __pycache__/
 *.backup
 cache/login_data.json
 
-
 # C extensions
 *.so
 

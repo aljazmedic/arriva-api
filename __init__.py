@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # coding=utf-8
-import requests, json
+import requests, json, os
 import ast, sqlite3
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -31,12 +31,10 @@ def get_db(name):#connects to database
 		return conn
 	else:
 		return _databases[name[:-3]]
-
 def close_db(name):#closes and removes database from memory
 	if _databases.get(name[:-3], None) is not None:
 		_databases[name[:-3]].close()
 	del _databases[name[:-3]]
-
 @contextmanager
 def db_connect(name, *args, **kwargs): ##My custom context manager for connecting to my databases
 	db = get_db(name, *args, **kwargs)
@@ -44,6 +42,7 @@ def db_connect(name, *args, **kwargs): ##My custom context manager for connectin
 		yield db
 	finally:
 		close_db(name)
+
 
 def get_coords(geolocator, _id, city, _pass=False, cache_db=None):
 	##Retrives coordinates for city query word and binds it to location data with arriva's id
@@ -125,9 +124,14 @@ def initiate(s):
 	cTIMESTAMP_test = cTOKEN_test = ""
 	try: #load cached creds from json
 		logging.info("Loading cached credentials")
-		with open("cache/login_data.json") as rf:
-			cached_text = json.load(rf)
-		cTIMESTAMP_test, cTOKEN_test = cached_text
+		try:
+			with open("cache/login_data.json") as rf:
+				cached_text = json.load(rf)
+			cTIMESTAMP_test, cTOKEN_test = cached_text
+		except (FileNotFoundError, json.decoder.JSONDecodeError, ValueError) as e:
+			logging.info("Failed to locate 'cache/login_data.json'!")
+			raise OutdatedTokenException
+			
 		##Test the cached data
 		data_test = {
 			"JSON":1,
@@ -165,7 +169,7 @@ def initiate(s):
 
 def update_location_database(sess):
 	##DB places is structired bus_stop_id, name, does_have_coord, coord1, coord2
-	with db_connect("places.db") as places_db:
+	with db_connect("cache/places.db") as places_db:
 		places_cursor = places_db.cursor()
 		##Create a table, if it does not exist
 		try:
@@ -177,7 +181,7 @@ def update_location_database(sess):
 
 		geopy_locator = Nominatim(user_agent="bus-stop-locator")
 		##cache location data for later use
-		with db_connect("cache/loc_data.db") as loc_data_db:
+		with db_connect("loc_data.db") as loc_data_db:
 			loc_data_cursor = loc_data_db.cursor()
 			try:
 				logging.info("Creating table 'locatinos' in 'loc_data.db'")
